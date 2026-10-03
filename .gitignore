@@ -1,0 +1,10 @@
+# Salidas de compilación del script y del IDE.
+/build/
+/out/
+/bin/
+*.class
+
+# Preferencias locales del IDE y metadatos de macOS.
+/.idea/
+*.iml
+.DS_Store
