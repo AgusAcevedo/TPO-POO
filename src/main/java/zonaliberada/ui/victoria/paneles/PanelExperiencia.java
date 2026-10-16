@@ -1,37 +1,34 @@
 package zonaliberada.ui.victoria.paneles;
 
-import java.awt.BorderLayout;
-import java.awt.Font;
-import java.awt.GridLayout;
-import javax.swing.JLabel;
+import java.awt.*;
+import java.util.List;
 import javax.swing.JPanel;
-import zonaliberada.ui.DatosDemo;
-import zonaliberada.ui.DatosDemo.Ficha;
-import zonaliberada.ui.Estilo;
-import zonaliberada.ui.Imagenes;
-import zonaliberada.ui.PanelSeccion;
+import zonaliberada.dtos.*;
+import zonaliberada.ui.*;
 
-/** XP actual de la party y recompensa de ejemplo de una batalla normal. */
+/** Solo los participantes capturados aparecen, incluso si terminaron KO. */
 public final class PanelExperiencia extends PanelSeccion {
-    public PanelExperiencia() {
+    public PanelExperiencia(ResultadoBatallaDTO resultado, List<PersonajeDTO> roster) {
         super(new BorderLayout());
         JPanel contenido = Estilo.panel(new BorderLayout(0, 12));
-        contenido.add(Estilo.etiqueta("Recompensa de ejemplo: +5 XP por aliado", 13, Font.PLAIN),
-                BorderLayout.NORTH);
-        JPanel lista = Estilo.panel(new GridLayout(4, 1, 0, 10));
-        for (Ficha ficha : DatosDemo.partyActiva()) {
-            JPanel fila = Estilo.panel(new BorderLayout(8, 3));
-            fila.add(new JLabel(Imagenes.icono(ficha.imagen, 42, 63)), BorderLayout.WEST);
-            JPanel datos = Estilo.panel(new BorderLayout(0, 3));
-            datos.add(Estilo.etiqueta(ficha.nombre + " · Nivel " + ficha.nivel + " · XP actual",
-                    14, Font.BOLD), BorderLayout.NORTH);
-            // La vista no simula subidas de nivel: eso será responsabilidad del modelo.
-            datos.add(Estilo.barra("XP", ficha.experiencia, ficha.experienciaSiguiente,
-                    Estilo.DORADO), BorderLayout.CENTER);
+        contenido.add(Estilo.etiqueta("+" + resultado.getExperienciaPorParticipante() + " XP por participante",
+                15, Font.BOLD), BorderLayout.NORTH);
+        JPanel lista = Estilo.panel(new GridLayout(0, 1, 0, 12));
+        for (ResultadoBatallaDTO.ProgresoAliadoDTO progreso : resultado.getAliados()) {
+            PersonajeDTO ficha = PersonajeDTO.buscarPorId(roster, progreso.getId());
+            if (ficha == null) continue;
+            JPanel fila = Estilo.panel(new BorderLayout(10, 6));
+            fila.add(Imagenes.personaje(ficha, 42, 63), BorderLayout.WEST);
+            JPanel datos = Estilo.panel(new BorderLayout(0, 6));
+            String nivel = progreso.getNivelAnterior() == progreso.getNivelActual()
+                    ? "Nivel " + progreso.getNivelActual() : "Nivel " + progreso.getNivelAnterior()
+                        + " → " + progreso.getNivelActual();
+            datos.add(Estilo.etiqueta(progreso.getNombre() + " · " + nivel, 14, Font.BOLD), BorderLayout.NORTH);
+            datos.add(Estilo.experiencia(ficha), BorderLayout.CENTER);
             fila.add(datos, BorderLayout.CENTER);
-            lista.add(fila);
+            lista.add(Estilo.tarjeta(null, fila));
         }
-        contenido.add(lista, BorderLayout.CENTER);
-        add(Estilo.tarjeta("EXPERIENCIA", contenido), BorderLayout.CENTER);
+        contenido.add(Estilo.desplazableVertical(lista), BorderLayout.CENTER);
+        add(Estilo.tarjeta("EXPERIENCIA", contenido));
     }
 }

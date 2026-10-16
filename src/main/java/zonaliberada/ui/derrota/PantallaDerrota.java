@@ -1,26 +1,29 @@
 package zonaliberada.ui.derrota;
 
-import java.awt.BorderLayout;
-import java.awt.GridLayout;
-import java.util.function.Consumer;
-import javax.swing.JPanel;
+import java.awt.*;
+import javax.swing.*;
 import zonaliberada.PantallaId;
-import zonaliberada.ui.Estilo;
-import zonaliberada.ui.PantallaBase;
+import zonaliberada.dtos.ResultadoBatallaDTO;
+import zonaliberada.ui.*;
 import zonaliberada.ui.derrota.paneles.PanelMensajeDerrota;
 
-/** Resultado de derrota: permite reintentar el combate o volver al menú. */
+/** La restauración ya ocurrió; reintentar inicia un encuentro nuevo desde ella. */
 public final class PantallaDerrota extends PantallaBase {
-    public PantallaDerrota(Consumer<PantallaId> navegar) {
-        super("DERROTA", "derrota.png", navegar);
-
-        // La vista informa el resultado. Restaurar el checkpoint será tarea
-        // del controlador, no de este panel ni de su botón Reintentar.
-        add(new PanelMensajeDerrota(), BorderLayout.CENTER);
-
-        JPanel pie = Estilo.panel(new GridLayout(1, 2, 12, 0));
-        pie.add(ir("REINTENTAR BATALLA", Estilo.VERDE, PantallaId.BATALLA));
-        pie.add(ir("VOLVER AL MENÚ", Estilo.GRIS, PantallaId.INICIO));
+    public PantallaDerrota(ContextoUI contexto) {
+        super("DERROTA", "derrota.png", contexto);
+        JPanel pie = Estilo.panel(new GridLayout(1, 3, 12, 0));
+        JButton reintentar = Estilo.boton("REINTENTAR BATALLA", Estilo.VERDE);
+        reintentar.addActionListener(e -> contexto.reintentarBatalla());
+        pie.add(reintentar);
+        pie.add(ir("REORGANIZAR PARTY", Estilo.AZUL, PantallaId.PARTY));
+        JButton menu = Estilo.boton("VOLVER AL MENÚ", Estilo.GRIS);
+        menu.addActionListener(e -> contexto.volverAlMenu());
+        pie.add(menu);
         add(pie, BorderLayout.SOUTH);
+    }
+
+    @Override public void actualizar() {
+        ResultadoBatallaDTO resultado = contexto.juego().getUltimoResultado();
+        if (resultado != null) reemplazarCentro(new PanelMensajeDerrota(resultado));
     }
 }

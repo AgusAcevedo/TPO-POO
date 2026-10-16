@@ -1,56 +1,47 @@
 package zonaliberada.ui.zona.paneles;
 
-import java.awt.BorderLayout;
-import java.awt.Font;
-import java.awt.GridLayout;
-import java.util.function.Consumer;
-import javax.swing.JButton;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.SwingConstants;
+import java.awt.*;
+import javax.swing.*;
 import zonaliberada.PantallaId;
-import zonaliberada.ui.Estilo;
-import zonaliberada.ui.PanelSeccion;
+import zonaliberada.dtos.MapaDTO;
+import zonaliberada.models.mapa.*;
+import zonaliberada.ui.*;
 
-/** Las cinco ubicaciones fijas de la zona A, en el mismo orden del mapa. */
+/** Tarjetas ordenadas: iniciar delega el beneficio o el combate al backend. */
 public final class PanelUbicaciones extends PanelSeccion {
-    public PanelUbicaciones(Consumer<PantallaId> navegar, Consumer<String> avisoPendiente) {
-        // Cinco tarjetas iguales, una al lado de otra.
-        super(new GridLayout(1, 5, 12, 0));
-        add(ubicacion("BATALLA 1", "Completada<br>Se puede repetir", "REPETIR",
-                PantallaId.BATALLA, navegar, avisoPendiente));
-        add(ubicacion("MEJORA 1", "Disponible<br>Recompensa de zona", "RECIBIR",
-                null, navegar, avisoPendiente));
-        add(ubicacion("BATALLA 2", "Batalla normal", null, null, navegar, avisoPendiente));
-        add(ubicacion("MEJORA 2", "Recompensa de zona", null, null, navegar, avisoPendiente));
-        add(ubicacion("BOSS", "Boss de zona<br>No se puede repetir", null, null,
-                navegar, avisoPendiente));
+    public PanelUbicaciones(MapaDTO.ZonaDTO zona, ContextoUI contexto) {
+        super(new GridLayout(1, zona.getUbicaciones().size(), 12, 0));
+        setPreferredSize(new Dimension(zona.getUbicaciones().size() * 225, 290));
+        for (MapaDTO.UbicacionDTO ubicacion : zona.getUbicaciones()) add(tarjeta(ubicacion, contexto));
     }
 
-    private JPanel ubicacion(String titulo, String descripcion, String accion, PantallaId destino,
-            Consumer<PantallaId> navegar, Consumer<String> avisoPendiente) {
-        JPanel contenido = Estilo.panel(new BorderLayout(0, 14));
-        JLabel texto = Estilo.etiqueta("<html><center>" + descripcion + "</center></html>",
-                13, Font.PLAIN);
-        texto.setHorizontalAlignment(SwingConstants.CENTER);
-        contenido.add(texto, BorderLayout.CENTER);
-
-        // Una acción null representa una ubicación bloqueada en esta maqueta.
-        if (accion == null) {
-            JLabel bloqueada = Estilo.etiqueta("BLOQUEADA", 13, Font.BOLD);
-            bloqueada.setForeground(Estilo.ROJO);
-            bloqueada.setHorizontalAlignment(SwingConstants.CENTER);
-            contenido.add(bloqueada, BorderLayout.SOUTH);
-        } else {
-            JButton boton = Estilo.boton(accion, Estilo.VERDE);
-            if (destino == null) {
-                // Las recompensas todavía no modifican estadísticas ni objetos.
-                boton.addActionListener(evento -> avisoPendiente.accept("Resolver esta ubicación"));
-            } else {
-                boton.addActionListener(evento -> navegar.accept(destino));
-            }
-            contenido.add(boton, BorderLayout.SOUTH);
-        }
-        return Estilo.tarjeta(titulo, contenido);
+    private JPanel tarjeta(MapaDTO.UbicacionDTO u, ContextoUI contexto) {
+        boolean combate = u.getTipo() == TipoUbicacion.BATALLA
+                || u.getTipo() == TipoUbicacion.BOSS_ZONA || u.getTipo() == TipoUbicacion.BOSS_FINAL;
+        boolean entrenamiento = u.getEstado() == EstadoUbicacion.COMPLETADA && u.isRepetible();
+        String detalle = TextosUI.legible(u.getTipo().name()) + "\n"
+                + TextosUI.legible(u.getEstado().name()) + "\n\n"
+                + u.getExperiencia() + " XP por participante";
+        if (!entrenamiento) {
+            detalle += "\n" + u.getItems().size() + " objeto(s) de recompensa";
+            if (!u.getAliadosDesbloqueados().isEmpty()) detalle += "\nDesbloquea: "
+                    + String.join(", ", u.getAliadosDesbloqueados());
+        } else detalle += "\nSin repetir objetos ni desbloqueos.";
+        JPanel contenido = Estilo.panel(new BorderLayout(0, 12));
+        contenido.add(Estilo.descripcion(detalle), BorderLayout.CENTER);
+        // Una actividad disponible puede requerir completar la formación antes de combatir.
+        boolean revisarParty = combate && u.getEstado() == EstadoUbicacion.DISPONIBLE && !u.isPuedeIniciarse();
+        String texto = revisarParty ? "ARMAR PARTY" : entrenamiento ? "ENTRENAR"
+                : u.isPuedeIniciarse() ? combate ? "COMBATIR" : "RECIBIR"
+                : u.getEstado() == EstadoUbicacion.COMPLETADA ? "COMPLETADA" : "BLOQUEADA";
+        JButton boton = Estilo.boton(texto, u.isPuedeIniciarse() ? Estilo.VERDE : Estilo.GRIS);
+        boton.setName("ubicacion:" + u.getId());
+        boton.setEnabled(u.isPuedeIniciarse() || revisarParty);
+        boton.addActionListener(e -> {
+            if (revisarParty) contexto.mostrar(PantallaId.PARTY);
+            else contexto.iniciarUbicacion(u.getId());
+        });
+        contenido.add(boton, BorderLayout.SOUTH);
+        return Estilo.tarjeta("<html>" + TextosUI.html(u.getNombre()) + "</html>", contenido);
     }
 }

@@ -1,10 +1,14 @@
 package zonaliberada;
 
-import java.awt.CardLayout;
-import java.awt.Dimension;
-import javax.swing.JFrame;
-import javax.swing.JPanel;
-import zonaliberada.ui.DatosDemo.Ficha;
+import java.awt.*;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
+import java.util.EnumMap;
+import java.util.Map;
+import javax.swing.*;
+
+import zonaliberada.controllers.ControladorPartida;
+import zonaliberada.ui.*;
 import zonaliberada.ui.batalla.PantallaBatalla;
 import zonaliberada.ui.derrota.PantallaDerrota;
 import zonaliberada.ui.inicio.PantallaInicio;
@@ -15,52 +19,72 @@ import zonaliberada.ui.personaje.PantallaDetallePersonaje;
 import zonaliberada.ui.victoria.PantallaVictoria;
 import zonaliberada.ui.zona.PantallaMapaZona;
 
-/** Una sola ventana que alterna entre paneles; todavía no es un controlador del juego. */
+/** Una ventana y una sesión compartida; CardLayout no crea otra partida al navegar. */
 public final class VentanaJuego extends JFrame {
-    // CardLayout funciona como un mazo: todos los paneles están registrados,
-    // pero solo uno es visible. Cambiar de pantalla no crea otra ventana.
+    // CardLayout conserva las pantallas y muestra una por vez, identificada por PantallaId.
     private final CardLayout tarjetas = new CardLayout();
     private final JPanel contenido = new JPanel(tarjetas);
-    private final PantallaDetallePersonaje detalle;
+    private final Map<PantallaId, PantallaBase> pantallas = new EnumMap<>(PantallaId.class);
+    private final ContextoUI contexto;
 
-    public VentanaJuego() {
+    public VentanaJuego() { this(new ControladorPartida()); }
+
+    /** Permite usar un controlador existente y conservar su misma sesión. */
+    public VentanaJuego(ControladorPartida controlador) {
         super("Zona Liberada");
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setMinimumSize(new Dimension(1050, 650));
-        setSize(1280, 720);
-        // null indica que la ventana debe centrarse en la pantalla del equipo.
-        setLocationRelativeTo(null);
+        // Las referencias this::... y las lambdas se guardan para ejecutarlas cuando se soliciten.
+        contexto = new ContextoUI(controlador, this::mostrar,
+                mensaje -> JOptionPane.showMessageDialog(this, mensaje, "Zona Liberada",
+                        JOptionPane.INFORMATION_MESSAGE),
+                mensaje -> JOptionPane.showConfirmDialog(this, mensaje, "Zona Liberada",
+                        JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION,
+                this::cerrarJuego);
 
-        // Creamos cada vista una sola vez. this::mostrar pasa a los paneles
-        // la función que deben llamar cuando quieran navegar a otra pantalla.
-        detalle = new PantallaDetallePersonaje(this::mostrar);
-        agregar(PantallaId.INICIO, new PantallaInicio(this::mostrar));
-        agregar(PantallaId.MAPA_PRINCIPAL, new PantallaMapaPrincipal(this::mostrar));
-        agregar(PantallaId.MAPA_ZONA, new PantallaMapaZona(this::mostrar));
-        agregar(PantallaId.PARTY, new PantallaParty(this::mostrar, this::verDetalle));
-        agregar(PantallaId.INVENTARIO, new PantallaInventario(this::mostrar));
-        agregar(PantallaId.DETALLE_PERSONAJE, detalle);
-        agregar(PantallaId.BATALLA, new PantallaBatalla(this::mostrar));
-        agregar(PantallaId.VICTORIA, new PantallaVictoria(this::mostrar));
-        agregar(PantallaId.DERROTA, new PantallaDerrota(this::mostrar));
-
-        // Instalamos el panel principal como contenido de la ventana.
-        setContentPane(contenido);
+        inicializarComponentes();
+        inicializarEventos();
         mostrar(PantallaId.INICIO);
     }
 
-    private void agregar(PantallaId id, JPanel pantalla) {
-        // name() convierte el identificador del enum en la clave de CardLayout.
-        contenido.add(pantalla, id.name());
+    private void inicializarComponentes() {
+        // El cierre debe pasar por la confirmación de pérdida de progreso.
+        setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
+        setMinimumSize(new Dimension(1050, 700));
+        setSize(1280, 800);
+        setLocationRelativeTo(null);
+        agregar(PantallaId.INICIO, new PantallaInicio(contexto));
+        agregar(PantallaId.MAPA_PRINCIPAL, new PantallaMapaPrincipal(contexto));
+        agregar(PantallaId.MAPA_ZONA, new PantallaMapaZona(contexto));
+        agregar(PantallaId.PARTY, new PantallaParty(contexto));
+        agregar(PantallaId.INVENTARIO, new PantallaInventario(contexto));
+        agregar(PantallaId.DETALLE_PERSONAJE, new PantallaDetallePersonaje(contexto));
+        agregar(PantallaId.BATALLA, new PantallaBatalla(contexto));
+        agregar(PantallaId.VICTORIA, new PantallaVictoria(contexto));
+        agregar(PantallaId.DERROTA, new PantallaDerrota(contexto));
+
+        setContentPane(contenido);
+    }
+
+    private void inicializarEventos() {
+        addWindowListener(new WindowAdapter() {
+            @Override public void windowClosing(WindowEvent evento) { cerrarJuego(); }
+        });
     }
 
     public void mostrar(PantallaId id) {
+        PantallaBase pantalla = pantallas.get(id);
+        // Se reconstruye la información visible antes de mostrar una pantalla ya existente.
+        pantalla.actualizar();
         tarjetas.show(contenido, id.name());
+        contenido.revalidate();
+        contenido.repaint();
     }
 
-    private void verDetalle(Ficha ficha) {
-        // Solo actualizamos datos de muestra de la vista: no modificamos la party.
-        detalle.mostrarFicha(ficha);
-        mostrar(PantallaId.DETALLE_PERSONAJE);
+    private void agregar(PantallaId id, PantallaBase pantalla) {
+        pantallas.put(id, pantalla);
+        contenido.add(pantalla, id.name());
+    }
+
+    private void cerrarJuego() {
+        if (contexto.prepararSalida()) dispose();
     }
 }

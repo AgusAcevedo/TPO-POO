@@ -8,3 +8,6 @@
 /.idea/
 *.iml
 .DS_Store
+
+# Checkpoints generados al ejecutar el juego.
+/partidas/

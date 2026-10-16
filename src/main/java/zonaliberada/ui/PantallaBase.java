@@ -1,45 +1,42 @@
 package zonaliberada.ui;
 
-import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.Graphics;
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
+import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.util.function.Consumer;
-import javax.swing.JButton;
-import javax.swing.JOptionPane;
-import javax.swing.JPanel;
+import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import zonaliberada.PantallaId;
 
-/** Fondo ilustrado, márgenes y navegación compartidos por las pantallas. */
+/** Fondo, navegación y refresco comunes; las reglas siguen en el controlador. */
 public abstract class PantallaBase extends JPanel {
-    // Consumer es una función que recibe un PantallaId y no devuelve nada.
-    // La ventana nos la entrega para que el panel no necesite conocer el JFrame.
-    private final Consumer<PantallaId> navegar;
-    private final BufferedImage fondo;
+    protected final ContextoUI contexto;
+    private BufferedImage fondo;
+    private final JLabel titulo;
 
-    protected PantallaBase(String titulo, String archivoFondo, Consumer<PantallaId> navegar) {
-        // BorderLayout reserva zonas arriba, abajo y en el centro, entre otras.
-        // Los dos 12 indican la separación horizontal y vertical entre zonas.
+    protected PantallaBase(String nombre, String archivoFondo, ContextoUI contexto) {
         super(new BorderLayout(12, 12));
-        this.navegar = navegar;
-        fondo = Imagenes.cargar("/imagenes/fondos/" + archivoFondo);
+        this.contexto = contexto;
+        cambiarFondo(archivoFondo);
         setBackground(Estilo.CREMA);
         setBorder(new EmptyBorder(14, 16, 14, 16));
-        // Un título null permite ubicar el nombre dentro del contenido, como
-        // hacemos en el menú. No está escrito dentro del PNG.
-        if (titulo != null) {
-            add(Estilo.titulo(titulo), BorderLayout.NORTH);
-        }
+        titulo = nombre == null ? null : Estilo.titulo(nombre);
+        if (titulo != null) add(titulo, BorderLayout.NORTH);
+    }
+
+    /** La ventana lo llama cada vez que entra: nunca conserva un DTO viejo. */
+    public abstract void actualizar();
+
+    protected void titulo(String texto) {
+        if (titulo != null) titulo.setText(texto);
+    }
+
+    protected final void cambiarFondo(String archivo) {
+        fondo = Imagenes.cargar("/imagenes/fondos/" + archivo);
     }
 
     @Override
     protected void paintComponent(Graphics graficos) {
         super.paintComponent(graficos);
-        // Solo dibujamos una imagen de fondo. Botones y textos siguen siendo
-        // componentes Swing normales, colocados por los layouts.
+        // Dibujamos sobre una copia para no alterar el contexto gráfico que Swing comparte.
         Graphics2D dibujo = (Graphics2D) graficos.create();
         dibujo.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
                 RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
@@ -49,21 +46,26 @@ public abstract class PantallaBase extends JPanel {
 
     protected JButton ir(String texto, Color color, PantallaId destino) {
         JButton boton = Estilo.boton(texto, color);
-        // El listener se registra ahora, pero se ejecuta recién al hacer clic.
-        // La expresión evento -> ... es una lambda de Java.
+        // El listener se ejecuta al hacer clic, no durante la creación del botón.
         boton.addActionListener(evento -> mostrar(destino));
         return boton;
     }
 
-    protected void mostrar(PantallaId destino) {
-        // accept ejecuta la función que recibimos en el constructor.
-        navegar.accept(destino);
+    protected JButton guardarPendiente(String texto) {
+        JButton boton = Estilo.boton(texto, Estilo.AZUL);
+        boton.setEnabled(false);
+        boton.setToolTipText("Guardar partidas está pendiente de implementar");
+        return boton;
     }
 
-    protected void avisoPendiente(String accion) {
-        // Este aviso marca las acciones que aún no tienen modelo/controlador.
-        JOptionPane.showMessageDialog(this,
-                accion + " se conectará al modelo y a los controladores más adelante.",
-                "Vista de demostración", JOptionPane.INFORMATION_MESSAGE);
+    protected void mostrar(PantallaId destino) { contexto.mostrar(destino); }
+
+    protected void reemplazarCentro(Component componente) {
+        Component anterior = ((BorderLayout) getLayout()).getLayoutComponent(BorderLayout.CENTER);
+        if (anterior != null) remove(anterior);
+        add(componente, BorderLayout.CENTER);
+        // revalidate recalcula la distribución; repaint solicita volver a dibujar.
+        revalidate();
+        repaint();
     }
 }

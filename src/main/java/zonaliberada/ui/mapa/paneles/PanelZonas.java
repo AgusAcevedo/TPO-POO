@@ -1,57 +1,40 @@
 package zonaliberada.ui.mapa.paneles;
 
-import java.awt.BorderLayout;
-import java.awt.Font;
-import java.awt.GridLayout;
-import java.util.function.Consumer;
-import javax.swing.JButton;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.SwingConstants;
-import zonaliberada.PantallaId;
-import zonaliberada.ui.Estilo;
-import zonaliberada.ui.Imagenes;
-import zonaliberada.ui.PanelSeccion;
+import java.awt.*;
+import javax.swing.*;
+import zonaliberada.dtos.MapaDTO;
+import zonaliberada.models.mapa.EstadoUbicacion;
+import zonaliberada.ui.*;
 
-/** Fila de zonas del mapa; cada tarjeta conserva su botón de ingreso. */
+/** Genera las tarjetas de zonas a partir del desbloqueo y el progreso del mapa. */
 public final class PanelZonas extends PanelSeccion {
-    public PanelZonas(Consumer<PantallaId> navegar) {
-        // Una fila, cuatro columnas. Las tarjetas mantienen el mismo tamaño.
-        super(new GridLayout(1, 4, 14, 0));
-        add(zona("ZONA A", "Palermo · CABA", "Planetario / Bosques de Palermo",
-                "zona_palermo.png", true, navegar));
-        add(zona("ZONA B", "Barracas · CABA", "Puente / barrio",
-                "zona_barracas.png", false, navegar));
-        add(zona("ZONA C", "Avellaneda · Zona Sur", "Estadio / estación",
-                "zona_avellaneda.png", false, navegar));
-        add(zona("ZONA D", "Morón · Zona Oeste", "Plaza / estación",
-                "zona_moron.png", false, navegar));
+    public PanelZonas(MapaDTO mapa, ContextoUI contexto) {
+        super(new GridLayout(1, mapa.getZonas().size(), 14, 0));
+        setPreferredSize(new Dimension(mapa.getZonas().size() * 300, 325));
+        for (int i = 0; i < mapa.getZonas().size(); i++) add(zona(mapa.getZonas().get(i), i, contexto));
     }
 
-    private JPanel zona(String nombre, String lugar, String referencia,
-            String miniatura, boolean abierta, Consumer<PantallaId> navegar) {
-        JPanel contenido = Estilo.panel(new BorderLayout(0, 8));
-        // Cada zona tiene una vista previa distinta, incluso si aún está cerrada.
-        JLabel paisaje = new JLabel(Imagenes.icono("/imagenes/fondos/" + miniatura, 196, 110));
-        paisaje.setHorizontalAlignment(SwingConstants.CENTER);
+    private JPanel zona(MapaDTO.ZonaDTO zona, int indice, ContextoUI contexto) {
+        JPanel contenido = Estilo.panel(new BorderLayout(0, 12));
+        JLabel paisaje = new JLabel(Imagenes.icono(
+                "/imagenes/fondos/" + Imagenes.fondoZona(indice), 240, 130), SwingConstants.CENTER);
         contenido.add(paisaje, BorderLayout.NORTH);
-        // Swing admite HTML básico en las etiquetas para partir líneas.
-        JLabel descripcion = Estilo.etiqueta("<html><center>" + lugar
-                + "<br><br>" + referencia + "</center></html>", 14, Font.PLAIN);
+        int completas = 0;
+        for (MapaDTO.UbicacionDTO ubicacion : zona.getUbicaciones()) {
+            if (ubicacion.getEstado() == EstadoUbicacion.COMPLETADA) completas++;
+        }
+        JLabel descripcion = Estilo.etiqueta("<html><center>" + completas + "/"
+                + zona.getUbicaciones().size() + " ubicaciones completadas<br><br>"
+                + (zona.isCompletada() ? "Zona completada" : zona.isDesbloqueada()
+                    ? "Zona disponible" : "Completá la zona anterior") + "</center></html>", 14, Font.PLAIN);
         descripcion.setHorizontalAlignment(SwingConstants.CENTER);
         contenido.add(descripcion, BorderLayout.CENTER);
-
-        if (abierta) {
-            JButton ingresar = Estilo.boton("INGRESAR", Estilo.VERDE);
-            ingresar.addActionListener(evento -> navegar.accept(PantallaId.MAPA_ZONA));
-            contenido.add(ingresar, BorderLayout.SOUTH);
-        } else {
-            // Una zona cerrada no ofrece una acción que el jugador no pueda usar.
-            JLabel bloqueada = Estilo.etiqueta("BLOQUEADA", 14, Font.BOLD);
-            bloqueada.setHorizontalAlignment(SwingConstants.CENTER);
-            bloqueada.setForeground(Estilo.ROJO);
-            contenido.add(bloqueada, BorderLayout.SOUTH);
-        }
-        return Estilo.tarjeta(nombre, contenido);
+        JButton boton = Estilo.boton(zona.isDesbloqueada() ? "INGRESAR" : "BLOQUEADA",
+                zona.isDesbloqueada() ? Estilo.VERDE : Estilo.GRIS);
+        boton.setName("zona:" + indice);
+        boton.setEnabled(zona.isDesbloqueada());
+        boton.addActionListener(e -> contexto.verZona(indice));
+        contenido.add(boton, BorderLayout.SOUTH);
+        return Estilo.tarjeta(zona.getNombre(), contenido);
     }
 }

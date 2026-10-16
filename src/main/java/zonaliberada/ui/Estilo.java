@@ -6,6 +6,7 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.LayoutManager;
+import java.awt.Rectangle;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -14,6 +15,11 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JProgressBar;
 import javax.swing.SwingConstants;
+import javax.swing.JScrollPane;
+import javax.swing.JViewport;
+import javax.swing.Scrollable;
+import javax.swing.JTextArea;
+import zonaliberada.dtos.PersonajeDTO;
 import javax.swing.border.EmptyBorder;
 
 /** Métodos de ayuda para crear componentes Swing con un estilo consistente. */
@@ -46,7 +52,7 @@ public final class Estilo {
     }
 
     /** Envuelve un panel ya construido con borde, márgenes y un título opcional. */
-    public static JPanel tarjeta(String titulo, JPanel contenido) {
+    public static JPanel tarjeta(String titulo, Component contenido) {
         JPanel tarjeta = panel(new BorderLayout(8, 8));
         tarjeta.setOpaque(true);
         // El borde compuesto combina una línea visible con espacio interior.
@@ -66,6 +72,7 @@ public final class Estilo {
     /** Centra una fila de tarjetas verticalmente sin fijar coordenadas x/y. */
     public static JPanel centrarFila(JPanel fila, int alto) {
         JPanel contenedor = panel(null);
+        // BoxLayout acomoda en un eje; los espacios flexibles centran la fila en vertical.
         contenedor.setLayout(new BoxLayout(contenedor, BoxLayout.Y_AXIS));
         fila.setAlignmentX(Component.CENTER_ALIGNMENT);
         fila.setPreferredSize(new Dimension(0, alto));
@@ -97,6 +104,7 @@ public final class Estilo {
 
     public static JButton boton(String texto, Color fondo) {
         JButton boton = new JButton(texto);
+        boton.setName(texto);
         boton.setFont(TEXTO.deriveFont(Font.BOLD));
         boton.setBackground(fondo);
         // En botones neutros usamos texto oscuro para mantener el contraste.
@@ -107,6 +115,41 @@ public final class Estilo {
         boton.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(TINTA, 2), new EmptyBorder(10, 14, 10, 14)));
         return boton;
+    }
+
+    public static JScrollPane desplazable(Component contenido) {
+        JScrollPane scroll = new JScrollPane(contenido);
+        scroll.setBorder(BorderFactory.createEmptyBorder());
+        scroll.setOpaque(false);
+        scroll.getViewport().setOpaque(false);
+        scroll.getVerticalScrollBar().setUnitIncrement(18);
+        return scroll;
+    }
+
+    /** Las listas verticales se ajustan al ancho: no esconden botones a la derecha. */
+    public static JScrollPane desplazableVertical(Component contenido) {
+        return desplazable(new ContenedorVertical(contenido));
+    }
+
+    public static JTextArea descripcion(String texto) {
+        JTextArea area = new JTextArea(texto, 2, 20);
+        area.setFont(TEXTO.deriveFont(13f));
+        area.setForeground(TINTA);
+        area.setOpaque(false);
+        area.setEditable(false);
+        area.setFocusable(false);
+        area.setLineWrap(true);
+        area.setWrapStyleWord(true);
+        return area;
+    }
+
+    public static JPanel experiencia(PersonajeDTO personaje) {
+        if (personaje.getExperienciaSiguiente() > 0) {
+            return barra("XP", personaje.getExperiencia(), personaje.getExperienciaSiguiente(), DORADO);
+        }
+        JPanel panel = panel(new BorderLayout());
+        panel.add(etiqueta("Nivel máximo alcanzado", 12, Font.BOLD));
+        return panel;
     }
 
     public static JPanel barra(String nombre, int valor, int maximo, Color color) {
@@ -129,5 +172,26 @@ public final class Estilo {
         fila.add(Box.createHorizontalStrut(6));
         fila.add(barra);
         return fila;
+    }
+
+    // Scrollable permite ajustar el ancho al área visible y conservar el desplazamiento vertical.
+    private static final class ContenedorVertical extends JPanel implements Scrollable {
+        private ContenedorVertical(Component contenido) {
+            super(new BorderLayout());
+            setOpaque(false);
+            add(contenido);
+        }
+
+        @Override public Dimension getPreferredScrollableViewportSize() { return getPreferredSize(); }
+        @Override public int getScrollableUnitIncrement(Rectangle visible, int orientacion, int direccion) {
+            return 18;
+        }
+        @Override public int getScrollableBlockIncrement(Rectangle visible, int orientacion, int direccion) {
+            return Math.max(18, (orientacion == SwingConstants.VERTICAL ? visible.height : visible.width) - 18);
+        }
+        @Override public boolean getScrollableTracksViewportWidth() { return true; }
+        @Override public boolean getScrollableTracksViewportHeight() {
+            return getParent() instanceof JViewport viewport && getPreferredSize().height <= viewport.getHeight();
+        }
     }
 }

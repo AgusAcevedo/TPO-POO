@@ -1,33 +1,42 @@
 package zonaliberada.ui.party;
 
-import java.awt.BorderLayout;
-import java.awt.GridLayout;
-import java.util.function.Consumer;
-import javax.swing.JPanel;
+import java.awt.*;
+import java.util.List;
+import javax.swing.*;
 import zonaliberada.PantallaId;
-import zonaliberada.ui.Estilo;
-import zonaliberada.ui.PantallaBase;
-import zonaliberada.ui.DatosDemo.Ficha;
-import zonaliberada.ui.party.paneles.PanelAliadosActivos;
-import zonaliberada.ui.party.paneles.PanelCatalogoAliados;
+import zonaliberada.dtos.PersonajeDTO;
+import zonaliberada.models.ReglasJuego;
+import zonaliberada.ui.*;
+import zonaliberada.ui.party.paneles.*;
 
-/** Muestra la party de ejemplo y permite consultar la ficha de cada aliado. */
+/** Edición de las seis posiciones y catálogo real de aliados. */
 public final class PantallaParty extends PantallaBase {
-    public PantallaParty(Consumer<PantallaId> navegar, Consumer<Ficha> verDetalle) {
-        super("PARTY Y PERSONAJES", "party.png", navegar);
-
-        // Dos funciones distintas: navegar cambia de pantalla; verDetalle
-        // comunica además qué ficha queremos mostrar, sin crear un controlador.
-        JPanel cuerpo = Estilo.panel(new BorderLayout(0, 15));
-        cuerpo.add(new PanelAliadosActivos(verDetalle), BorderLayout.NORTH);
-        cuerpo.add(Estilo.tarjeta("CATÁLOGO DE ALIADOS", new PanelCatalogoAliados(verDetalle)),
-                BorderLayout.CENTER);
-        add(cuerpo, BorderLayout.CENTER);
-
-        // No ofrecemos "Confirmar" porque todavía no se puede editar la party.
-        JPanel pie = Estilo.panel(new GridLayout(1, 2, 12, 0));
+    public PantallaParty(ContextoUI contexto) {
+        super("PARTY Y PERSONAJES", "party.png", contexto);
+        JPanel pie = Estilo.panel(new GridLayout(1, 3, 12, 0));
         pie.add(ir("INVENTARIO", Estilo.VERDE, PantallaId.INVENTARIO));
+        pie.add(guardarPendiente("GUARDAR FORMACIÓN"));
         pie.add(ir("VOLVER A ZONAS", Estilo.GRIS, PantallaId.MAPA_PRINCIPAL));
         add(pie, BorderLayout.SOUTH);
+    }
+
+    @Override public void actualizar() {
+        List<PersonajeDTO> aliados = contexto.juego().getPartyDTO();
+        int seleccionados = 0;
+        for (PersonajeDTO aliado : aliados) {
+            if (aliado.getPosicion() > 0) seleccionados++;
+        }
+        JPanel cuerpo = Estilo.panel(new BorderLayout(0, 10));
+        JLabel nota = Estilo.etiqueta("Seleccionados: " + seleccionados
+                + "/" + ReglasJuego.MAXIMO_ALIADOS_ACTIVOS + " · Para combatir: "
+                + ReglasJuego.MINIMO_ALIADOS_ACTIVOS + "–" + ReglasJuego.MAXIMO_ALIADOS_ACTIVOS
+                + " · Frente: 1–3 · Retaguardia: 4–6", 14, Font.BOLD);
+        cuerpo.add(Estilo.tarjeta(null, nota), BorderLayout.NORTH);
+        cuerpo.add(Estilo.desplazable(new PanelAliadosActivos(aliados, contexto)), BorderLayout.CENTER);
+        JScrollPane catalogo = Estilo.desplazable(new PanelCatalogoAliados(
+                aliados, contexto.juego().getMapaDTO(), contexto));
+        catalogo.setPreferredSize(new Dimension(0, 175));
+        cuerpo.add(Estilo.tarjeta("CATÁLOGO DE ALIADOS", catalogo), BorderLayout.SOUTH);
+        reemplazarCentro(cuerpo);
     }
 }
